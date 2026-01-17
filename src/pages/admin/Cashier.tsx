@@ -109,6 +109,22 @@ interface FolioPosting {
   is_reversed: boolean;
 }
 
+interface Reservation {
+  id: string;
+  confirmation_code: string;
+  start_date: string;
+  end_date: string;
+  total_amount: number;
+  status: string;
+  guest: {
+    full_name: string;
+  } | null;
+  unit: {
+    name_en: string;
+    name_ar: string;
+  } | null;
+}
+
 export default function Cashier() {
   const { language } = useLanguage();
   const [activeTab, setActiveTab] = useState('folios');
@@ -127,6 +143,10 @@ export default function Cashier() {
   const [selectedReservationId, setSelectedReservationId] = useState<string | null>(null);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
   
+  // Reservations state (for creating invoices)
+  const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [loadingReservations, setLoadingReservations] = useState(false);
+  
   // Dialogs
   const [isPostingDialogOpen, setIsPostingDialogOpen] = useState(false);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
@@ -134,6 +154,7 @@ export default function Cashier() {
   useEffect(() => {
     fetchFolios();
     fetchInvoices();
+    fetchReservations();
   }, []);
 
   useEffect(() => {
@@ -223,6 +244,34 @@ export default function Cashier() {
     }
   };
 
+  const fetchReservations = async () => {
+    try {
+      setLoadingReservations(true);
+      const { data, error } = await supabase
+        .from('reservations')
+        .select(`
+          id,
+          confirmation_code,
+          start_date,
+          end_date,
+          total_amount,
+          status,
+          guest:guests(full_name),
+          unit:units(name_en, name_ar)
+        `)
+        .in('status', ['confirmed', 'checked_in', 'checked_out'])
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+      setReservations(data || []);
+    } catch (error) {
+      console.error('Error fetching reservations:', error);
+    } finally {
+      setLoadingReservations(false);
+    }
+  };
+
   const handleGenerateInvoice = (reservationId: string) => {
     setSelectedReservationId(reservationId);
     setSelectedInvoiceId(null);
@@ -274,6 +323,10 @@ export default function Cashier() {
           <TabsTrigger value="folios" className="gap-2">
             <Receipt className="h-4 w-4" />
             {language === 'ar' ? 'الفواتير المفتوحة' : 'Open Folios'}
+          </TabsTrigger>
+          <TabsTrigger value="reservations" className="gap-2">
+            <Building2 className="h-4 w-4" />
+            {language === 'ar' ? 'الحجوزات' : 'Reservations'}
           </TabsTrigger>
           <TabsTrigger value="invoices" className="gap-2">
             <FileText className="h-4 w-4" />
@@ -484,6 +537,80 @@ export default function Cashier() {
               )}
             </div>
           </div>
+        </TabsContent>
+
+        {/* Reservations Tab - For creating invoices */}
+        <TabsContent value="reservations" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <Building2 className="h-5 w-5 text-accent" />
+                  {language === 'ar' ? 'إنشاء فاتورة ضريبية من حجز' : 'Create Tax Invoice from Reservation'}
+                </span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loadingReservations ? (
+                <div className="space-y-2">
+                  {[1, 2, 3].map(i => (
+                    <Skeleton key={i} className="h-16 w-full" />
+                  ))}
+                </div>
+              ) : reservations.length === 0 ? (
+                <p className="text-center text-muted-foreground py-12">
+                  {language === 'ar' ? 'لا توجد حجوزات' : 'No reservations found'}
+                </p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>{language === 'ar' ? 'رقم الحجز' : 'Booking Ref'}</TableHead>
+                      <TableHead>{language === 'ar' ? 'العميل' : 'Guest'}</TableHead>
+                      <TableHead>{language === 'ar' ? 'الوحدة' : 'Unit'}</TableHead>
+                      <TableHead>{language === 'ar' ? 'التواريخ' : 'Dates'}</TableHead>
+                      <TableHead className="text-end">{language === 'ar' ? 'المبلغ' : 'Amount'}</TableHead>
+                      <TableHead className="text-center">{language === 'ar' ? 'الحالة' : 'Status'}</TableHead>
+                      <TableHead></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {reservations.map((reservation) => (
+                      <TableRow key={reservation.id}>
+                        <TableCell className="font-mono font-medium">{reservation.confirmation_code}</TableCell>
+                        <TableCell>{reservation.guest?.full_name || '-'}</TableCell>
+                        <TableCell>
+                          {language === 'ar' ? reservation.unit?.name_ar : reservation.unit?.name_en}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {formatDate(reservation.start_date)} - {formatDate(reservation.end_date)}
+                        </TableCell>
+                        <TableCell className="text-end font-medium">
+                          {Number(reservation.total_amount).toLocaleString()} SAR
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant={reservation.status === 'checked_out' ? 'default' : 'secondary'}>
+                            {reservation.status === 'confirmed' && (language === 'ar' ? 'مؤكد' : 'Confirmed')}
+                            {reservation.status === 'checked_in' && (language === 'ar' ? 'مسجل' : 'Checked In')}
+                            {reservation.status === 'checked_out' && (language === 'ar' ? 'مغادر' : 'Checked Out')}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Button 
+                            size="sm"
+                            onClick={() => handleGenerateInvoice(reservation.id)}
+                          >
+                            <FileText className="h-4 w-4 me-2" />
+                            {language === 'ar' ? 'إنشاء فاتورة' : 'Create Invoice'}
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Tax Invoices Tab */}
