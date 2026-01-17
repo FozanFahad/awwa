@@ -30,6 +30,7 @@ import Cashier from "@/pages/admin/Cashier";
 import RoomTypes from "@/pages/admin/RoomTypes";
 import Rooms from "@/pages/admin/Rooms";
 import Profiles from "@/pages/admin/Profiles";
+import Settings from "@/pages/admin/Settings";
 
 const queryClient = new QueryClient();
 
@@ -66,6 +67,7 @@ const App = () => (
                 <Route path="profiles" element={<Profiles />} />
                 <Route path="units" element={<AdminUnits />} />
                 <Route path="tasks" element={<AdminTasks />} />
+                <Route path="settings" element={<Settings />} />
               </Route>
               
               {/* 404 */}
