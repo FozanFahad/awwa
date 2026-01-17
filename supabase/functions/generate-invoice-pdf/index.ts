@@ -21,123 +21,341 @@ function generatePDFContent(invoice: any, companyInfo: any): string {
   const nights = invoice.reservation?.nights || 1;
   const pricePerNight = (invoice.subtotal / nights).toFixed(2);
 
-  // Build HTML content for PDF
+  // Build HTML content for PDF with proper RTL support
   const html = `
 <!DOCTYPE html>
-<html dir="ltr">
+<html lang="ar">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@400;600;700&display=swap');
+    
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: Arial, Helvetica, sans-serif; padding: 40px; max-width: 800px; margin: 0 auto; font-size: 12px; }
-    .header { text-align: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #333; }
-    .company-name { font-size: 24px; font-weight: bold; margin-bottom: 5px; }
-    .company-name-ar { font-size: 20px; font-weight: bold; direction: rtl; margin-bottom: 10px; }
-    .company-info { font-size: 11px; color: #666; margin: 3px 0; }
-    .invoice-title { font-size: 18px; font-weight: bold; background: #f0f0f0; padding: 10px 20px; display: inline-block; margin-top: 15px; }
-    .info-grid { display: flex; justify-content: space-between; margin: 25px 0; gap: 20px; }
-    .info-box { flex: 1; padding: 15px; background: #f9f9f9; border-radius: 5px; }
-    .info-box h3 { font-size: 12px; color: #666; margin-bottom: 10px; text-transform: uppercase; }
-    .info-box p { font-size: 11px; margin: 5px 0; }
-    .info-box strong { font-weight: 600; }
-    table { width: 100%; border-collapse: collapse; margin: 25px 0; }
-    th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-    th { background: #f0f0f0; font-weight: 600; }
+    
+    body { 
+      font-family: 'Noto Sans Arabic', Arial, sans-serif; 
+      padding: 30px; 
+      max-width: 800px; 
+      margin: 0 auto; 
+      font-size: 12px;
+      line-height: 1.6;
+      background: #fff;
+    }
+    
+    .header { 
+      text-align: center; 
+      margin-bottom: 25px; 
+      padding-bottom: 20px; 
+      border-bottom: 3px solid #1a365d; 
+    }
+    
+    .company-name-en { 
+      font-size: 22px; 
+      font-weight: 700; 
+      color: #1a365d;
+      margin-bottom: 5px; 
+    }
+    
+    .company-name-ar { 
+      font-size: 20px; 
+      font-weight: 700; 
+      color: #1a365d;
+      direction: rtl;
+      unicode-bidi: bidi-override;
+      margin-bottom: 10px; 
+    }
+    
+    .company-info { 
+      font-size: 11px; 
+      color: #666; 
+      margin: 4px 0; 
+    }
+    
+    .invoice-title { 
+      display: inline-block;
+      margin-top: 15px; 
+      padding: 10px 30px;
+      background: linear-gradient(135deg, #1a365d 0%, #2c5282 100%);
+      color: white;
+      font-size: 16px; 
+      font-weight: 700;
+      border-radius: 4px;
+    }
+    
+    .invoice-title-ar {
+      direction: rtl;
+      unicode-bidi: bidi-override;
+    }
+    
+    .info-section { 
+      display: flex; 
+      justify-content: space-between; 
+      margin: 20px 0; 
+      gap: 20px; 
+    }
+    
+    .info-box { 
+      flex: 1; 
+      padding: 15px; 
+      background: #f8fafc; 
+      border-radius: 8px;
+      border: 1px solid #e2e8f0;
+    }
+    
+    .info-box-title { 
+      font-size: 11px; 
+      color: #64748b; 
+      margin-bottom: 10px; 
+      text-transform: uppercase;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+    
+    .info-box-title-ar {
+      direction: rtl;
+      unicode-bidi: bidi-override;
+      text-align: right;
+    }
+    
+    .info-row { 
+      font-size: 12px; 
+      margin: 6px 0;
+      display: flex;
+      justify-content: space-between;
+    }
+    
+    .info-label { 
+      color: #64748b;
+      font-weight: 500;
+    }
+    
+    .info-value { 
+      font-weight: 600;
+      color: #1e293b;
+    }
+    
+    .info-value-ar {
+      direction: rtl;
+      unicode-bidi: bidi-override;
+    }
+    
+    .items-table { 
+      width: 100%; 
+      border-collapse: collapse; 
+      margin: 20px 0;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    
+    .items-table th { 
+      background: #1a365d;
+      color: white;
+      padding: 12px; 
+      text-align: left;
+      font-weight: 600;
+      font-size: 11px;
+    }
+    
+    .items-table td { 
+      border-bottom: 1px solid #e2e8f0; 
+      padding: 12px; 
+      background: #fff;
+    }
+    
     .text-right { text-align: right; }
     .text-center { text-align: center; }
-    .totals { margin: 25px 0; }
-    .totals-row { display: flex; justify-content: flex-end; }
-    .totals-table { width: 280px; }
-    .totals-table td { padding: 8px 12px; border: none; }
-    .totals-table .label { text-align: left; color: #666; }
-    .totals-table .value { text-align: right; font-weight: 500; }
-    .totals-table .total-row { border-top: 2px solid #333; font-size: 16px; font-weight: bold; }
-    .qr-section { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px dashed #ccc; }
-    .qr-label { font-size: 11px; color: #666; margin-bottom: 10px; }
-    .footer { text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; font-size: 11px; color: #666; }
+    
+    .item-name-ar {
+      direction: rtl;
+      unicode-bidi: bidi-override;
+      display: block;
+      color: #64748b;
+      font-size: 11px;
+      margin-top: 2px;
+    }
+    
+    .totals-section { 
+      display: flex;
+      justify-content: flex-end;
+      margin: 20px 0; 
+    }
+    
+    .totals-box { 
+      width: 280px;
+      background: #f8fafc;
+      border-radius: 8px;
+      padding: 15px;
+      border: 1px solid #e2e8f0;
+    }
+    
+    .totals-row { 
+      display: flex; 
+      justify-content: space-between; 
+      padding: 8px 0;
+      font-size: 12px;
+    }
+    
+    .totals-row.subtotal {
+      border-bottom: 1px solid #e2e8f0;
+    }
+    
+    .totals-row.total { 
+      border-top: 2px solid #1a365d;
+      margin-top: 8px;
+      padding-top: 12px;
+      font-size: 16px; 
+      font-weight: 700;
+      color: #1a365d;
+    }
+    
+    .qr-section { 
+      text-align: center; 
+      margin-top: 30px; 
+      padding-top: 20px; 
+      border-top: 2px dashed #e2e8f0; 
+    }
+    
+    .qr-label { 
+      font-size: 11px; 
+      color: #64748b; 
+      margin-bottom: 10px; 
+    }
+    
+    .qr-image {
+      background: white;
+      padding: 10px;
+      display: inline-block;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .footer { 
+      text-align: center; 
+      margin-top: 30px; 
+      padding-top: 20px; 
+      border-top: 1px solid #e2e8f0; 
+      font-size: 11px; 
+      color: #64748b; 
+    }
+    
+    .footer-ar {
+      direction: rtl;
+      unicode-bidi: bidi-override;
+    }
+
+    @media print {
+      body { padding: 20px; }
+      .items-table { box-shadow: none; }
+    }
   </style>
 </head>
 <body>
   <div class="header">
-    <div class="company-name">${companyInfo.name_en}</div>
+    <div class="company-name-en">${companyInfo.name_en}</div>
     <div class="company-name-ar">${companyInfo.name_ar}</div>
     <p class="company-info">${companyInfo.address_en}</p>
-    <p class="company-info">VAT No. / الرقم الضريبي: ${companyInfo.vat_number}</p>
-    ${companyInfo.cr_number ? `<p class="company-info">CR No. / السجل التجاري: ${companyInfo.cr_number}</p>` : ''}
-    <div class="invoice-title">TAX INVOICE / فاتورة ضريبية</div>
-  </div>
-
-  <div class="info-grid">
-    <div class="info-box">
-      <h3>Invoice Details / بيانات الفاتورة</h3>
-      <p><strong>Invoice No.:</strong> ${invoice.invoice_no}</p>
-      <p><strong>Date:</strong> ${formatDateTime(invoice.issued_at)}</p>
-      <p><strong>Booking Ref:</strong> ${invoice.reservation?.confirmation_code || '-'}</p>
-    </div>
-    <div class="info-box">
-      <h3>Customer Details / بيانات العميل</h3>
-      <p><strong>Name:</strong> ${invoice.reservation?.guest?.full_name || '-'}</p>
-      ${invoice.reservation?.guest?.phone ? `<p><strong>Phone:</strong> ${invoice.reservation.guest.phone}</p>` : ''}
-      ${invoice.buyer_vat_number ? `<p><strong>VAT No.:</strong> ${invoice.buyer_vat_number}</p>` : ''}
+    <p class="company-info">VAT No.: ${companyInfo.vat_number} | الرقم الضريبي</p>
+    ${companyInfo.cr_number ? `<p class="company-info">CR No.: ${companyInfo.cr_number} | السجل التجاري</p>` : ''}
+    <div class="invoice-title">
+      TAX INVOICE | <span class="invoice-title-ar">فاتورة ضريبية</span>
     </div>
   </div>
 
-  <table>
+  <div class="info-section">
+    <div class="info-box">
+      <div class="info-box-title">Invoice Details | <span class="info-box-title-ar">بيانات الفاتورة</span></div>
+      <div class="info-row">
+        <span class="info-label">Invoice No.:</span>
+        <span class="info-value">${invoice.invoice_no}</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Date:</span>
+        <span class="info-value">${formatDateTime(invoice.issued_at)}</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Booking Ref:</span>
+        <span class="info-value">${invoice.reservation?.confirmation_code || '-'}</span>
+      </div>
+    </div>
+    <div class="info-box">
+      <div class="info-box-title">Customer Details | <span class="info-box-title-ar">بيانات العميل</span></div>
+      <div class="info-row">
+        <span class="info-label">Name:</span>
+        <span class="info-value info-value-ar">${invoice.reservation?.guest?.full_name || '-'}</span>
+      </div>
+      ${invoice.reservation?.guest?.phone ? `
+      <div class="info-row">
+        <span class="info-label">Phone:</span>
+        <span class="info-value">${invoice.reservation.guest.phone}</span>
+      </div>
+      ` : ''}
+      ${invoice.buyer_vat_number ? `
+      <div class="info-row">
+        <span class="info-label">VAT No.:</span>
+        <span class="info-value">${invoice.buyer_vat_number}</span>
+      </div>
+      ` : ''}
+    </div>
+  </div>
+
+  <table class="items-table">
     <thead>
       <tr>
-        <th>Description / الوصف</th>
-        <th class="text-center">Qty / الكمية</th>
-        <th class="text-right">Unit Price / السعر</th>
-        <th class="text-right">Total / المجموع</th>
+        <th style="width: 50%">Description | الوصف</th>
+        <th class="text-center" style="width: 15%">Qty | الكمية</th>
+        <th class="text-right" style="width: 17%">Unit Price | السعر</th>
+        <th class="text-right" style="width: 18%">Total | المجموع</th>
       </tr>
     </thead>
     <tbody>
       <tr>
         <td>
           <strong>${invoice.reservation?.unit?.name_en || 'Accommodation'}</strong>
-          ${invoice.reservation?.unit?.name_ar ? `<br/><span style="direction:rtl">${invoice.reservation.unit.name_ar}</span>` : ''}
+          ${invoice.reservation?.unit?.name_ar ? `<span class="item-name-ar">${invoice.reservation.unit.name_ar}</span>` : ''}
           <br/>
-          <span style="font-size:10px;color:#666">
+          <span style="font-size:10px;color:#64748b">
             ${invoice.reservation?.start_date ? formatDate(invoice.reservation.start_date) : ''} - 
             ${invoice.reservation?.end_date ? formatDate(invoice.reservation.end_date) : ''}
           </span>
         </td>
-        <td class="text-center">${nights} nights</td>
+        <td class="text-center">${nights} nights | ليلة</td>
         <td class="text-right">${pricePerNight} SAR</td>
         <td class="text-right"><strong>${invoice.subtotal.toFixed(2)} SAR</strong></td>
       </tr>
     </tbody>
   </table>
 
-  <div class="totals">
-    <div class="totals-row">
-      <table class="totals-table">
-        <tr>
-          <td class="label">Subtotal / المجموع الفرعي</td>
-          <td class="value">${invoice.subtotal.toFixed(2)} SAR</td>
-        </tr>
-        <tr>
-          <td class="label">VAT 15% / ضريبة القيمة المضافة</td>
-          <td class="value">${invoice.tax_amount.toFixed(2)} SAR</td>
-        </tr>
-        <tr class="total-row">
-          <td class="label">Total / الإجمالي</td>
-          <td class="value">${invoice.total_amount.toFixed(2)} SAR</td>
-        </tr>
-      </table>
+  <div class="totals-section">
+    <div class="totals-box">
+      <div class="totals-row subtotal">
+        <span>Subtotal | المجموع الفرعي</span>
+        <span>${invoice.subtotal.toFixed(2)} SAR</span>
+      </div>
+      <div class="totals-row">
+        <span>VAT 15% | ضريبة القيمة المضافة</span>
+        <span>${invoice.tax_amount.toFixed(2)} SAR</span>
+      </div>
+      <div class="totals-row total">
+        <span>Total | الإجمالي</span>
+        <span>${invoice.total_amount.toFixed(2)} SAR</span>
+      </div>
     </div>
   </div>
 
   ${invoice.zatca_qr_code ? `
   <div class="qr-section">
-    <p class="qr-label">E-Invoice QR Code (ZATCA) / رمز الفاتورة الإلكترونية</p>
-    <img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(invoice.zatca_qr_code)}" alt="QR Code" />
+    <p class="qr-label">E-Invoice QR Code (ZATCA) | رمز الفاتورة الإلكترونية</p>
+    <div class="qr-image">
+      <img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(invoice.zatca_qr_code)}" alt="QR Code" />
+    </div>
   </div>
   ` : ''}
 
   <div class="footer">
-    <p>Thank you for staying with us / شكراً لاختياركم</p>
-    <p style="margin-top:5px">${companyInfo.name_en} | ${companyInfo.name_ar}</p>
+    <p>Thank you for staying with us | <span class="footer-ar">شكراً لاختياركم</span></p>
+    <p style="margin-top:8px;font-weight:600">${companyInfo.name_en} | <span class="footer-ar">${companyInfo.name_ar}</span></p>
   </div>
 </body>
 </html>
