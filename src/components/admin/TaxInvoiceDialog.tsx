@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
 import { companySettings } from '@/config/companySettings';
+import companyLogo from '@/assets/company-logo.jpg';
 import {
   Dialog,
   DialogContent,
@@ -326,6 +327,11 @@ export function TaxInvoiceDialog({ open, onOpenChange, reservationId, existingIn
         <div ref={printRef} className="bg-background p-6 border rounded-lg">
           {/* Header */}
           <div className="text-center mb-6 pb-4 border-b-2 border-foreground">
+            <img 
+              src={companyLogo} 
+              alt={language === 'ar' ? companyInfo.name_ar : companyInfo.name_en}
+              className="h-20 mx-auto mb-3 object-contain"
+            />
             <h1 className="text-2xl font-bold">
               {language === 'ar' ? companyInfo.name_ar : companyInfo.name_en}
             </h1>
@@ -335,9 +341,11 @@ export function TaxInvoiceDialog({ open, onOpenChange, reservationId, existingIn
             <p className="text-sm mt-1">
               {language === 'ar' ? 'الرقم الضريبي' : 'VAT No.'}: {companyInfo.vat_number}
             </p>
-            <p className="text-sm">
-              {language === 'ar' ? 'السجل التجاري' : 'CR No.'}: {companyInfo.cr_number}
-            </p>
+            {companyInfo.cr_number && (
+              <p className="text-sm">
+                {language === 'ar' ? 'السجل التجاري' : 'CR No.'}: {companyInfo.cr_number}
+              </p>
+            )}
             <div className="mt-4 bg-muted/50 py-2 px-4 inline-block rounded">
               <h2 className="text-lg font-bold">
                 {language === 'ar' ? 'فاتورة ضريبية' : 'TAX INVOICE'}
