@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/hooks/use-toast';
 import {
   Table,
   TableBody,
@@ -21,7 +24,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogFooter,
 } from '@/components/ui/dialog';
 import {
@@ -41,118 +43,199 @@ import {
   Bath,
   Maximize,
   DollarSign,
+  Loader2,
 } from 'lucide-react';
+import type { Tables } from '@/integrations/supabase/types';
 
-interface RoomType {
-  id: string;
-  code: string;
-  nameEn: string;
-  nameAr: string;
-  baseOccupancy: number;
-  maxOccupancy: number;
-  bedrooms: number;
-  bathrooms: number;
-  sizeM2: number;
-  extraAdultRate: number;
-  extraChildRate: number;
-  roomCount: number;
-  isActive: boolean;
-}
-
-const roomTypes: RoomType[] = [
-  {
-    id: '1',
-    code: 'STD',
-    nameEn: 'Standard Room',
-    nameAr: 'غرفة قياسية',
-    baseOccupancy: 2,
-    maxOccupancy: 3,
-    bedrooms: 1,
-    bathrooms: 1,
-    sizeM2: 28,
-    extraAdultRate: 150,
-    extraChildRate: 75,
-    roomCount: 20,
-    isActive: true,
-  },
-  {
-    id: '2',
-    code: 'DLX',
-    nameEn: 'Deluxe Room',
-    nameAr: 'غرفة ديلوكس',
-    baseOccupancy: 2,
-    maxOccupancy: 3,
-    bedrooms: 1,
-    bathrooms: 1,
-    sizeM2: 35,
-    extraAdultRate: 175,
-    extraChildRate: 85,
-    roomCount: 15,
-    isActive: true,
-  },
-  {
-    id: '3',
-    code: 'SUI',
-    nameEn: 'Suite',
-    nameAr: 'جناح',
-    baseOccupancy: 2,
-    maxOccupancy: 4,
-    bedrooms: 1,
-    bathrooms: 2,
-    sizeM2: 55,
-    extraAdultRate: 200,
-    extraChildRate: 100,
-    roomCount: 8,
-    isActive: true,
-  },
-  {
-    id: '4',
-    code: 'EXC',
-    nameEn: 'Executive Suite',
-    nameAr: 'جناح تنفيذي',
-    baseOccupancy: 2,
-    maxOccupancy: 4,
-    bedrooms: 2,
-    bathrooms: 2,
-    sizeM2: 75,
-    extraAdultRate: 250,
-    extraChildRate: 125,
-    roomCount: 4,
-    isActive: true,
-  },
-  {
-    id: '5',
-    code: 'ROY',
-    nameEn: 'Royal Suite',
-    nameAr: 'جناح ملكي',
-    baseOccupancy: 4,
-    maxOccupancy: 6,
-    bedrooms: 3,
-    bathrooms: 3,
-    sizeM2: 120,
-    extraAdultRate: 350,
-    extraChildRate: 175,
-    roomCount: 2,
-    isActive: true,
-  },
-];
+type RoomType = Tables<'room_types'> & { roomCount?: number };
 
 export default function RoomTypes() {
   const { language } = useLanguage();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingType, setEditingType] = useState<RoomType | null>(null);
 
-  const totalRooms = roomTypes.reduce((sum, rt) => sum + rt.roomCount, 0);
+  // Form state
+  const [formData, setFormData] = useState({
+    code: '',
+    name_en: '',
+    name_ar: '',
+    base_occupancy: 2,
+    max_occupancy: 4,
+    bedrooms: 1,
+    bathrooms: 1,
+    size_m2: 35,
+    extra_adult_rate: 150,
+    extra_child_rate: 75,
+    is_active: true,
+  });
+
+  // Fetch room types with room count
+  const { data: roomTypes, isLoading } = useQuery({
+    queryKey: ['room-types'],
+    queryFn: async () => {
+      const { data: types, error } = await supabase
+        .from('room_types')
+        .select('*')
+        .order('sort_order');
+
+      if (error) throw error;
+
+      // Get room counts for each type
+      const { data: rooms } = await supabase
+        .from('rooms')
+        .select('room_type_id');
+
+      const roomCounts: Record<string, number> = {};
+      rooms?.forEach(room => {
+        roomCounts[room.room_type_id] = (roomCounts[room.room_type_id] || 0) + 1;
+      });
+
+      return types.map(type => ({
+        ...type,
+        roomCount: roomCounts[type.id] || 0,
+      }));
+    },
+  });
+
+  // Create/Update mutation
+  const saveMutation = useMutation({
+    mutationFn: async (data: typeof formData & { id?: string }) => {
+      const { data: properties } = await supabase
+        .from('properties')
+        .select('id')
+        .limit(1)
+        .single();
+
+      if (!properties) throw new Error('No property found');
+
+      if (data.id) {
+        const { error } = await supabase
+          .from('room_types')
+          .update({
+            code: data.code,
+            name_en: data.name_en,
+            name_ar: data.name_ar,
+            base_occupancy: data.base_occupancy,
+            max_occupancy: data.max_occupancy,
+            bedrooms: data.bedrooms,
+            bathrooms: data.bathrooms,
+            size_m2: data.size_m2,
+            extra_adult_rate: data.extra_adult_rate,
+            extra_child_rate: data.extra_child_rate,
+            is_active: data.is_active,
+          })
+          .eq('id', data.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('room_types').insert({
+          property_id: properties.id,
+          code: data.code,
+          name_en: data.name_en,
+          name_ar: data.name_ar,
+          base_occupancy: data.base_occupancy,
+          max_occupancy: data.max_occupancy,
+          bedrooms: data.bedrooms,
+          bathrooms: data.bathrooms,
+          size_m2: data.size_m2,
+          extra_adult_rate: data.extra_adult_rate,
+          extra_child_rate: data.extra_child_rate,
+          is_active: data.is_active,
+        });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['room-types'] });
+      setIsDialogOpen(false);
+      toast({
+        title: language === 'ar' ? 'تم الحفظ' : 'Saved',
+        description: language === 'ar' ? 'تم حفظ نوع الغرفة بنجاح' : 'Room type saved successfully',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: language === 'ar' ? 'خطأ' : 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Delete mutation
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('room_types').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['room-types'] });
+      toast({
+        title: language === 'ar' ? 'تم الحذف' : 'Deleted',
+        description: language === 'ar' ? 'تم حذف نوع الغرفة' : 'Room type deleted',
+      });
+    },
+  });
+
+  const totalRooms = roomTypes?.reduce((sum, rt) => sum + (rt.roomCount || 0), 0) || 0;
 
   const handleEdit = (roomType: RoomType) => {
     setEditingType(roomType);
+    setFormData({
+      code: roomType.code,
+      name_en: roomType.name_en,
+      name_ar: roomType.name_ar,
+      base_occupancy: roomType.base_occupancy,
+      max_occupancy: roomType.max_occupancy,
+      bedrooms: roomType.bedrooms,
+      bathrooms: roomType.bathrooms,
+      size_m2: roomType.size_m2 || 35,
+      extra_adult_rate: roomType.extra_adult_rate || 0,
+      extra_child_rate: roomType.extra_child_rate || 0,
+      is_active: roomType.is_active,
+    });
     setIsDialogOpen(true);
   };
 
   const handleCreate = () => {
     setEditingType(null);
+    setFormData({
+      code: '',
+      name_en: '',
+      name_ar: '',
+      base_occupancy: 2,
+      max_occupancy: 4,
+      bedrooms: 1,
+      bathrooms: 1,
+      size_m2: 35,
+      extra_adult_rate: 150,
+      extra_child_rate: 75,
+      is_active: true,
+    });
     setIsDialogOpen(true);
   };
+
+  const handleSave = () => {
+    saveMutation.mutate({
+      ...formData,
+      id: editingType?.id,
+    });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <Skeleton className="h-12 w-64" />
+        <div className="grid grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <Skeleton key={i} className="h-24" />
+          ))}
+        </div>
+        <Skeleton className="h-96" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -183,7 +266,7 @@ export default function RoomTypes() {
                 <BedDouble className="h-5 w-5 text-accent" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{roomTypes.length}</p>
+                <p className="text-2xl font-bold">{roomTypes?.length || 0}</p>
                 <p className="text-xs text-muted-foreground">
                   {language === 'ar' ? 'أنواع الغرف' : 'Room Types'}
                 </p>
@@ -213,7 +296,9 @@ export default function RoomTypes() {
                 <Users className="h-5 w-5 text-success" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{roomTypes.reduce((sum, rt) => sum + rt.maxOccupancy * rt.roomCount, 0)}</p>
+                <p className="text-2xl font-bold">
+                  {roomTypes?.reduce((sum, rt) => sum + rt.max_occupancy * (rt.roomCount || 0), 0) || 0}
+                </p>
                 <p className="text-xs text-muted-foreground">
                   {language === 'ar' ? 'أقصى سعة' : 'Max Capacity'}
                 </p>
@@ -228,7 +313,7 @@ export default function RoomTypes() {
                 <DollarSign className="h-5 w-5 text-primary" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{roomTypes.filter(rt => rt.isActive).length}</p>
+                <p className="text-2xl font-bold">{roomTypes?.filter(rt => rt.is_active).length || 0}</p>
                 <p className="text-xs text-muted-foreground">
                   {language === 'ar' ? 'أنواع نشطة' : 'Active Types'}
                 </p>
@@ -263,7 +348,7 @@ export default function RoomTypes() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {roomTypes.map((roomType) => (
+                {roomTypes?.map((roomType) => (
                   <TableRow key={roomType.id} className="hover:bg-muted/30">
                     <TableCell>
                       <Badge variant="outline" className="font-mono font-semibold">
@@ -272,16 +357,16 @@ export default function RoomTypes() {
                     </TableCell>
                     <TableCell>
                       <div>
-                        <p className="font-medium">{language === 'ar' ? roomType.nameAr : roomType.nameEn}</p>
-                        <p className="text-xs text-muted-foreground">{language === 'ar' ? roomType.nameEn : roomType.nameAr}</p>
+                        <p className="font-medium">{language === 'ar' ? roomType.name_ar : roomType.name_en}</p>
+                        <p className="text-xs text-muted-foreground">{language === 'ar' ? roomType.name_en : roomType.name_ar}</p>
                       </div>
                     </TableCell>
                     <TableCell className="text-center">
                       <div className="flex items-center justify-center gap-1">
                         <Users className="h-3 w-3 text-muted-foreground" />
-                        <span>{roomType.baseOccupancy}</span>
+                        <span>{roomType.base_occupancy}</span>
                         <span className="text-muted-foreground">-</span>
-                        <span>{roomType.maxOccupancy}</span>
+                        <span>{roomType.max_occupancy}</span>
                       </div>
                     </TableCell>
                     <TableCell className="text-center">
@@ -297,14 +382,14 @@ export default function RoomTypes() {
                       </div>
                     </TableCell>
                     <TableCell className="text-center">
-                      <span>{roomType.sizeM2} m²</span>
+                      <span>{roomType.size_m2 || '-'} m²</span>
                     </TableCell>
                     <TableCell className="text-center font-semibold">
-                      {roomType.roomCount}
+                      {roomType.roomCount || 0}
                     </TableCell>
                     <TableCell className="text-center">
-                      <Badge variant="outline" className={roomType.isActive ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'}>
-                        {roomType.isActive 
+                      <Badge variant="outline" className={roomType.is_active ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'}>
+                        {roomType.is_active 
                           ? (language === 'ar' ? 'نشط' : 'Active') 
                           : (language === 'ar' ? 'غير نشط' : 'Inactive')}
                       </Badge>
@@ -321,11 +406,7 @@ export default function RoomTypes() {
                             <Edit className="h-4 w-4 me-2" />
                             {language === 'ar' ? 'تعديل' : 'Edit'}
                           </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Copy className="h-4 w-4 me-2" />
-                            {language === 'ar' ? 'نسخ' : 'Duplicate'}
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive">
+                          <DropdownMenuItem onClick={() => deleteMutation.mutate(roomType.id)} className="text-destructive">
                             <Trash2 className="h-4 w-4 me-2" />
                             {language === 'ar' ? 'حذف' : 'Delete'}
                           </DropdownMenuItem>
@@ -360,14 +441,18 @@ export default function RoomTypes() {
               <Label>{language === 'ar' ? 'الكود' : 'Code'}</Label>
               <Input 
                 placeholder="e.g., DLX" 
-                defaultValue={editingType?.code}
+                value={formData.code}
+                onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
                 className="font-mono uppercase"
               />
             </div>
             <div className="space-y-2">
               <Label>{language === 'ar' ? 'الحالة' : 'Status'}</Label>
               <div className="flex items-center gap-2 h-10">
-                <Switch defaultChecked={editingType?.isActive ?? true} />
+                <Switch 
+                  checked={formData.is_active}
+                  onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
+                />
                 <span className="text-sm text-muted-foreground">
                   {language === 'ar' ? 'نشط' : 'Active'}
                 </span>
@@ -377,14 +462,16 @@ export default function RoomTypes() {
               <Label>{language === 'ar' ? 'الاسم (إنجليزي)' : 'Name (English)'}</Label>
               <Input 
                 placeholder="Deluxe Room" 
-                defaultValue={editingType?.nameEn}
+                value={formData.name_en}
+                onChange={(e) => setFormData({ ...formData, name_en: e.target.value })}
               />
             </div>
             <div className="space-y-2">
               <Label>{language === 'ar' ? 'الاسم (عربي)' : 'Name (Arabic)'}</Label>
               <Input 
                 placeholder="غرفة ديلوكس" 
-                defaultValue={editingType?.nameAr}
+                value={formData.name_ar}
+                onChange={(e) => setFormData({ ...formData, name_ar: e.target.value })}
                 dir="rtl"
               />
             </div>
@@ -392,48 +479,48 @@ export default function RoomTypes() {
               <Label>{language === 'ar' ? 'السعة الأساسية' : 'Base Occupancy'}</Label>
               <Input 
                 type="number" 
-                placeholder="2" 
-                defaultValue={editingType?.baseOccupancy}
+                value={formData.base_occupancy}
+                onChange={(e) => setFormData({ ...formData, base_occupancy: Number(e.target.value) })}
               />
             </div>
             <div className="space-y-2">
               <Label>{language === 'ar' ? 'أقصى سعة' : 'Max Occupancy'}</Label>
               <Input 
                 type="number" 
-                placeholder="4" 
-                defaultValue={editingType?.maxOccupancy}
+                value={formData.max_occupancy}
+                onChange={(e) => setFormData({ ...formData, max_occupancy: Number(e.target.value) })}
               />
             </div>
             <div className="space-y-2">
               <Label>{language === 'ar' ? 'غرف النوم' : 'Bedrooms'}</Label>
               <Input 
                 type="number" 
-                placeholder="1" 
-                defaultValue={editingType?.bedrooms}
+                value={formData.bedrooms}
+                onChange={(e) => setFormData({ ...formData, bedrooms: Number(e.target.value) })}
               />
             </div>
             <div className="space-y-2">
               <Label>{language === 'ar' ? 'الحمامات' : 'Bathrooms'}</Label>
               <Input 
                 type="number" 
-                placeholder="1" 
-                defaultValue={editingType?.bathrooms}
+                value={formData.bathrooms}
+                onChange={(e) => setFormData({ ...formData, bathrooms: Number(e.target.value) })}
               />
             </div>
             <div className="space-y-2">
               <Label>{language === 'ar' ? 'المساحة (م²)' : 'Size (m²)'}</Label>
               <Input 
                 type="number" 
-                placeholder="35" 
-                defaultValue={editingType?.sizeM2}
+                value={formData.size_m2}
+                onChange={(e) => setFormData({ ...formData, size_m2: Number(e.target.value) })}
               />
             </div>
             <div className="space-y-2">
               <Label>{language === 'ar' ? 'رسم الشخص الإضافي' : 'Extra Adult Rate'}</Label>
               <Input 
                 type="number" 
-                placeholder="150" 
-                defaultValue={editingType?.extraAdultRate}
+                value={formData.extra_adult_rate}
+                onChange={(e) => setFormData({ ...formData, extra_adult_rate: Number(e.target.value) })}
               />
             </div>
           </div>
@@ -441,7 +528,8 @@ export default function RoomTypes() {
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
               {language === 'ar' ? 'إلغاء' : 'Cancel'}
             </Button>
-            <Button className="btn-gold">
+            <Button onClick={handleSave} className="btn-gold" disabled={saveMutation.isPending}>
+              {saveMutation.isPending && <Loader2 className="h-4 w-4 me-2 animate-spin" />}
               {editingType 
                 ? (language === 'ar' ? 'حفظ التغييرات' : 'Save Changes')
                 : (language === 'ar' ? 'إضافة' : 'Add')}
