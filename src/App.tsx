@@ -23,6 +23,12 @@ import AdminReservations from "@/pages/admin/Reservations";
 import AdminUnits from "@/pages/admin/Units";
 import AdminTasks from "@/pages/admin/Tasks";
 import AdminCalendar from "@/pages/admin/Calendar";
+import FrontDesk from "@/pages/admin/FrontDesk";
+import Housekeeping from "@/pages/admin/Housekeeping";
+import Cashier from "@/pages/admin/Cashier";
+import RoomTypes from "@/pages/admin/RoomTypes";
+import Rooms from "@/pages/admin/Rooms";
+import Profiles from "@/pages/admin/Profiles";
 
 const queryClient = new QueryClient();
 
@@ -48,10 +54,16 @@ const App = () => (
               {/* Admin Routes */}
               <Route path="/admin" element={<AdminLayout />}>
                 <Route index element={<AdminDashboard />} />
+                <Route path="front-desk" element={<FrontDesk />} />
                 <Route path="reservations" element={<AdminReservations />} />
+                <Route path="calendar" element={<AdminCalendar />} />
+                <Route path="housekeeping" element={<Housekeeping />} />
+                <Route path="cashier" element={<Cashier />} />
+                <Route path="room-types" element={<RoomTypes />} />
+                <Route path="rooms" element={<Rooms />} />
+                <Route path="profiles" element={<Profiles />} />
                 <Route path="units" element={<AdminUnits />} />
                 <Route path="tasks" element={<AdminTasks />} />
-                <Route path="calendar" element={<AdminCalendar />} />
               </Route>
               
               {/* 404 */}
