@@ -1,9 +1,12 @@
 import { useState } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
   TableBody,
@@ -19,72 +22,12 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Search, Plus, MoreHorizontal, Eye, Edit, Trash2, Bed, Bath, Users } from 'lucide-react';
+import type { Tables, Enums } from '@/integrations/supabase/types';
 
-// Mock data
-const units = [
-  {
-    id: '1',
-    nameEn: 'Luxury Penthouse Suite',
-    nameAr: 'جناح بنتهاوس فاخر',
-    property: 'Al Faisaliah Residences',
-    type: 'Penthouse',
-    bedrooms: 3,
-    bathrooms: 2,
-    capacity: 6,
-    status: 'available',
-    baseRate: 1500,
-  },
-  {
-    id: '2',
-    nameEn: 'Modern Studio Apartment',
-    nameAr: 'شقة استوديو عصرية',
-    property: 'Kingdom Tower Residences',
-    type: 'Studio',
-    bedrooms: 1,
-    bathrooms: 1,
-    capacity: 2,
-    status: 'occupied',
-    baseRate: 450,
-  },
-  {
-    id: '3',
-    nameEn: 'Family Executive Suite',
-    nameAr: 'جناح عائلي تنفيذي',
-    property: 'Corniche Towers',
-    type: 'Suite',
-    bedrooms: 2,
-    bathrooms: 2,
-    capacity: 4,
-    status: 'occupied',
-    baseRate: 850,
-  },
-  {
-    id: '4',
-    nameEn: 'Seaside Luxury Villa',
-    nameAr: 'فيلا فاخرة على البحر',
-    property: 'Red Sea Villas',
-    type: 'Villa',
-    bedrooms: 4,
-    bathrooms: 3,
-    capacity: 8,
-    status: 'maintenance',
-    baseRate: 2200,
-  },
-  {
-    id: '5',
-    nameEn: 'Downtown Business Apartment',
-    nameAr: 'شقة أعمال وسط المدينة',
-    property: 'Olaya Business District',
-    type: 'Apartment',
-    bedrooms: 1,
-    bathrooms: 1,
-    capacity: 2,
-    status: 'available',
-    baseRate: 550,
-  },
-];
+type UnitStatus = Enums<'unit_status'>;
+type Unit = Tables<'units'> & { property?: Tables<'properties'> };
 
-const statusColors: Record<string, string> = {
+const statusColors: Record<UnitStatus, string> = {
   available: 'bg-success/10 text-success border-success/20',
   occupied: 'bg-info/10 text-info border-info/20',
   maintenance: 'bg-warning/10 text-warning border-warning/20',
@@ -95,14 +38,28 @@ export default function Units() {
   const { t, language } = useLanguage();
   const [searchQuery, setSearchQuery] = useState('');
 
-  const filteredUnits = units.filter((unit) => {
-    const name = language === 'ar' ? unit.nameAr : unit.nameEn;
-    return name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      unit.property.toLowerCase().includes(searchQuery.toLowerCase());
+  // Fetch units with property info
+  const { data: units, isLoading } = useQuery({
+    queryKey: ['units'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('units')
+        .select('*, property:properties(*)')
+        .order('name_en');
+      if (error) throw error;
+      return data as Unit[];
+    },
   });
 
-  const getStatusLabel = (status: string) => {
-    const labels: Record<string, { en: string; ar: string }> = {
+  const filteredUnits = units?.filter((unit) => {
+    const name = language === 'ar' ? unit.name_ar : unit.name_en;
+    const propertyName = language === 'ar' ? unit.property?.name_ar : unit.property?.name_en;
+    return name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      propertyName?.toLowerCase().includes(searchQuery.toLowerCase());
+  }) || [];
+
+  const getStatusLabel = (status: UnitStatus) => {
+    const labels: Record<UnitStatus, { en: string; ar: string }> = {
       available: { en: 'Available', ar: 'متاحة' },
       occupied: { en: 'Occupied', ar: 'مشغولة' },
       maintenance: { en: 'Maintenance', ar: 'صيانة' },
@@ -110,6 +67,20 @@ export default function Units() {
     };
     return language === 'ar' ? labels[status].ar : labels[status].en;
   };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <Skeleton className="h-12 w-64" />
+        <div className="grid grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <Skeleton key={i} className="h-20" />
+          ))}
+        </div>
+        <Skeleton className="h-96" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -137,14 +108,14 @@ export default function Units() {
           <p className="text-sm text-muted-foreground">
             {language === 'ar' ? 'الإجمالي' : 'Total Units'}
           </p>
-          <p className="text-2xl font-bold">{units.length}</p>
+          <p className="text-2xl font-bold">{units?.length || 0}</p>
         </Card>
         <Card className="p-4">
           <p className="text-sm text-muted-foreground">
             {language === 'ar' ? 'متاحة' : 'Available'}
           </p>
           <p className="text-2xl font-bold text-success">
-            {units.filter(u => u.status === 'available').length}
+            {units?.filter(u => u.status === 'available').length || 0}
           </p>
         </Card>
         <Card className="p-4">
@@ -152,7 +123,7 @@ export default function Units() {
             {language === 'ar' ? 'مشغولة' : 'Occupied'}
           </p>
           <p className="text-2xl font-bold text-info">
-            {units.filter(u => u.status === 'occupied').length}
+            {units?.filter(u => u.status === 'occupied').length || 0}
           </p>
         </Card>
         <Card className="p-4">
@@ -160,7 +131,7 @@ export default function Units() {
             {language === 'ar' ? 'صيانة' : 'Maintenance'}
           </p>
           <p className="text-2xl font-bold text-warning">
-            {units.filter(u => u.status === 'maintenance').length}
+            {units?.filter(u => u.status === 'maintenance').length || 0}
           </p>
         </Card>
       </div>
@@ -205,9 +176,6 @@ export default function Units() {
                     {language === 'ar' ? 'التفاصيل' : 'Details'}
                   </TableHead>
                   <TableHead className="font-semibold">
-                    {language === 'ar' ? 'السعر/ليلة' : 'Rate/Night'}
-                  </TableHead>
-                  <TableHead className="font-semibold">
                     {language === 'ar' ? 'الحالة' : 'Status'}
                   </TableHead>
                   <TableHead className="w-12"></TableHead>
@@ -217,12 +185,19 @@ export default function Units() {
                 {filteredUnits.map((unit) => (
                   <TableRow key={unit.id} className="hover:bg-muted/30">
                     <TableCell className="font-medium">
-                      {language === 'ar' ? unit.nameAr : unit.nameEn}
+                      <div>
+                        <p>{language === 'ar' ? unit.name_ar : unit.name_en}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {language === 'ar' ? unit.name_en : unit.name_ar}
+                        </p>
+                      </div>
                     </TableCell>
                     <TableCell className="text-muted-foreground">
-                      {unit.property}
+                      {language === 'ar' ? unit.property?.name_ar : unit.property?.name_en}
                     </TableCell>
-                    <TableCell>{unit.type}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{unit.unit_type}</Badge>
+                    </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-3 text-sm text-muted-foreground">
                         <span className="flex items-center gap-1">
@@ -238,9 +213,6 @@ export default function Units() {
                           {unit.capacity}
                         </span>
                       </div>
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      {unit.baseRate} {t('common.sar')}
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline" className={statusColors[unit.status]}>
