@@ -19,15 +19,16 @@ import {
 import { Button } from '@/components/ui/button';
 
 const menuItems = [
-  { icon: LayoutDashboard, labelKey: 'dashboard.overview', path: '/admin' },
-  { icon: Calendar, labelKey: 'dashboard.calendar', path: '/admin/calendar' },
-  { icon: ClipboardList, labelKey: 'dashboard.reservations', path: '/admin/reservations' },
-  { icon: Building2, labelKey: 'dashboard.units', path: '/admin/units' },
-  { icon: TrendingUp, labelKey: 'Rate Plans', path: '/admin/rates' },
-  { icon: CheckSquare, labelKey: 'dashboard.tasks', path: '/admin/tasks' },
-  { icon: DollarSign, labelKey: 'dashboard.finance', path: '/admin/finance' },
-  { icon: Users, labelKey: 'dashboard.users', path: '/admin/users' },
-  { icon: Settings, labelKey: 'dashboard.settings', path: '/admin/settings' },
+  { icon: LayoutDashboard, labelKey: 'Dashboard', path: '/admin' },
+  { icon: Users, labelKey: 'Front Desk', path: '/admin/front-desk' },
+  { icon: Calendar, labelKey: 'Calendar', path: '/admin/calendar' },
+  { icon: ClipboardList, labelKey: 'Reservations', path: '/admin/reservations' },
+  { icon: CheckSquare, labelKey: 'Housekeeping', path: '/admin/housekeeping' },
+  { icon: DollarSign, labelKey: 'Cashier', path: '/admin/cashier' },
+  { icon: Building2, labelKey: 'Room Types', path: '/admin/room-types' },
+  { icon: Home, labelKey: 'Rooms', path: '/admin/rooms' },
+  { icon: Users, labelKey: 'Profiles', path: '/admin/profiles' },
+  { icon: Settings, labelKey: 'Settings', path: '/admin/settings' },
 ];
 
 export function AdminSidebar() {
