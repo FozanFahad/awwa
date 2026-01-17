@@ -271,6 +271,53 @@ export function TaxInvoiceDialog({ open, onOpenChange, reservationId, existingIn
     }, 250);
   };
 
+  const handleDownloadPDF = async () => {
+    if (!invoice) return;
+    
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-invoice-pdf`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            invoiceId: invoice.id,
+            companyInfo: {
+              name_en: companyInfo.name_en,
+              name_ar: companyInfo.name_ar,
+              vat_number: companyInfo.vat_number,
+              address_en: companyInfo.address_en,
+              address_ar: companyInfo.address_ar,
+              cr_number: companyInfo.cr_number,
+            },
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to generate PDF');
+      }
+
+      const htmlContent = await response.text();
+      
+      // Open in new window for printing/saving as PDF
+      const pdfWindow = window.open('', '_blank');
+      if (pdfWindow) {
+        pdfWindow.document.write(htmlContent);
+        pdfWindow.document.close();
+        pdfWindow.focus();
+        // Trigger print dialog which allows saving as PDF
+        setTimeout(() => {
+          pdfWindow.print();
+        }, 500);
+      }
+    } catch (error) {
+      console.error('Error downloading PDF:', error);
+    }
+  };
+
   const formatDate = (dateStr: string) => {
     return format(new Date(dateStr), 'dd/MM/yyyy', { 
       locale: language === 'ar' ? ar : enUS 
@@ -313,6 +360,10 @@ export function TaxInvoiceDialog({ open, onOpenChange, reservationId, existingIn
             </span>
           </DialogTitle>
           <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handleDownloadPDF}>
+              <Download className="h-4 w-4 me-1" />
+              {language === 'ar' ? 'تحميل PDF' : 'Download PDF'}
+            </Button>
             <Button variant="outline" size="sm" onClick={handlePrint}>
               <Printer className="h-4 w-4 me-1" />
               {language === 'ar' ? 'طباعة' : 'Print'}
