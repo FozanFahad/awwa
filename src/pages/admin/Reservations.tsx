@@ -1,94 +1,119 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { supabase } from '@/integrations/supabase/client';
 import { ReservationsTable } from '@/components/admin/ReservationsTable';
+import { CreateReservationDialog } from '@/components/admin/reservations/CreateReservationDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, Filter, Plus, Download } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Search, Filter, Plus, Download, RefreshCw } from 'lucide-react';
+import { toast } from 'sonner';
+import type { Tables } from '@/integrations/supabase/types';
 
-// Mock data
-const allReservations = [
-  {
-    id: '1',
-    confirmationCode: 'AWA-A1B2C3',
-    guestName: 'Mohammed Al-Rashid',
-    unitName: 'Luxury Penthouse Suite',
-    checkIn: '2026-01-18',
-    checkOut: '2026-01-21',
-    nights: 3,
-    status: 'confirmed' as const,
-    totalAmount: 4650,
-    paymentStatus: 'paid' as const,
-  },
-  {
-    id: '2',
-    confirmationCode: 'AWA-D4E5F6',
-    guestName: 'Sara Abdullah',
-    unitName: 'Modern Studio Apartment',
-    checkIn: '2026-01-17',
-    checkOut: '2026-01-19',
-    nights: 2,
-    status: 'checked_in' as const,
-    totalAmount: 1050,
-    paymentStatus: 'paid' as const,
-  },
-  {
-    id: '3',
-    confirmationCode: 'AWA-G7H8I9',
-    guestName: 'Khalid Hassan',
-    unitName: 'Family Executive Suite',
-    checkIn: '2026-01-20',
-    checkOut: '2026-01-25',
-    nights: 5,
-    status: 'pending' as const,
-    totalAmount: 4400,
-    paymentStatus: 'pending' as const,
-  },
-  {
-    id: '4',
-    confirmationCode: 'AWA-J1K2L3',
-    guestName: 'Fatima Ahmed',
-    unitName: 'Seaside Luxury Villa',
-    checkIn: '2026-01-15',
-    checkOut: '2026-01-17',
-    nights: 2,
-    status: 'checked_out' as const,
-    totalAmount: 4550,
-    paymentStatus: 'paid' as const,
-  },
-  {
-    id: '5',
-    confirmationCode: 'AWA-M4N5O6',
-    guestName: 'Ahmed Salem',
-    unitName: 'Downtown Business Apartment',
-    checkIn: '2026-01-22',
-    checkOut: '2026-01-24',
-    nights: 2,
-    status: 'confirmed' as const,
-    totalAmount: 1250,
-    paymentStatus: 'partial' as const,
-  },
-  {
-    id: '6',
-    confirmationCode: 'AWA-P7Q8R9',
-    guestName: 'Nora Al-Turki',
-    unitName: 'Coastal Resort Suite',
-    checkIn: '2026-01-10',
-    checkOut: '2026-01-12',
-    nights: 2,
-    status: 'cancelled' as const,
-    totalAmount: 1650,
-    paymentStatus: 'refunded' as const,
-  },
-];
+type ReservationStatus = Tables<'reservations'>['status'];
+type PaymentStatus = Tables<'reservations'>['payment_status'];
+
+interface ReservationWithDetails {
+  id: string;
+  confirmationCode: string;
+  guestName: string;
+  unitName: string;
+  roomName: string | null;
+  checkIn: string;
+  checkOut: string;
+  nights: number;
+  status: ReservationStatus;
+  totalAmount: number;
+  paymentStatus: PaymentStatus;
+}
 
 export default function Reservations() {
   const { t, language } = useLanguage();
+  const [reservations, setReservations] = useState<ReservationWithDetails[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
-  const filteredReservations = allReservations.filter((res) => {
+  useEffect(() => {
+    fetchReservations();
+  }, []);
+
+  const fetchReservations = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('reservations')
+        .select(`
+          id,
+          confirmation_code,
+          start_date,
+          end_date,
+          nights,
+          status,
+          total_amount,
+          payment_status,
+          guest:guests(full_name),
+          unit:units(name_en, name_ar),
+          room:rooms(room_number)
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      const formatted: ReservationWithDetails[] = (data || []).map((r) => ({
+        id: r.id,
+        confirmationCode: r.confirmation_code,
+        guestName: r.guest?.full_name || 'Unknown',
+        unitName: language === 'ar' ? (r.unit?.name_ar || r.unit?.name_en || '-') : (r.unit?.name_en || '-'),
+        roomName: r.room?.room_number || null,
+        checkIn: r.start_date,
+        checkOut: r.end_date,
+        nights: r.nights || 1,
+        status: r.status,
+        totalAmount: Number(r.total_amount) || 0,
+        paymentStatus: r.payment_status,
+      }));
+
+      setReservations(formatted);
+    } catch (error) {
+      console.error('Error fetching reservations:', error);
+      toast.error(language === 'ar' ? 'خطأ في جلب الحجوزات' : 'Error fetching reservations');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleStatusChange = async (id: string, newStatus: string) => {
+    try {
+      const updateData: Record<string, unknown> = { status: newStatus };
+      
+      if (newStatus === 'checked_in') {
+        updateData.checked_in_at = new Date().toISOString();
+      } else if (newStatus === 'checked_out') {
+        updateData.checked_out_at = new Date().toISOString();
+      } else if (newStatus === 'cancelled') {
+        updateData.cancelled_at = new Date().toISOString();
+      }
+
+      const { error } = await supabase
+        .from('reservations')
+        .update(updateData)
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast.success(language === 'ar' ? 'تم تحديث الحالة' : 'Status updated');
+      fetchReservations();
+    } catch (error) {
+      console.error('Error updating status:', error);
+      toast.error(language === 'ar' ? 'خطأ في تحديث الحالة' : 'Error updating status');
+    }
+  };
+
+  const filteredReservations = reservations.filter((res) => {
     const matchesSearch = 
       res.confirmationCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
       res.guestName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -98,6 +123,13 @@ export default function Reservations() {
     
     return matchesSearch && matchesStatus;
   });
+
+  const stats = {
+    pending: reservations.filter(r => r.status === 'pending').length,
+    confirmed: reservations.filter(r => r.status === 'confirmed').length,
+    checkedIn: reservations.filter(r => r.status === 'checked_in').length,
+    total: reservations.length,
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -114,11 +146,25 @@ export default function Reservations() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="gap-2"
+            onClick={fetchReservations}
+            disabled={loading}
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            {language === 'ar' ? 'تحديث' : 'Refresh'}
+          </Button>
           <Button variant="outline" size="sm" className="gap-2">
             <Download className="h-4 w-4" />
             {language === 'ar' ? 'تصدير' : 'Export'}
           </Button>
-          <Button size="sm" className="gap-2 btn-gold">
+          <Button 
+            size="sm" 
+            className="gap-2 btn-gold"
+            onClick={() => setCreateDialogOpen(true)}
+          >
             <Plus className="h-4 w-4" />
             {language === 'ar' ? 'حجز جديد' : 'New Booking'}
           </Button>
@@ -160,25 +206,35 @@ export default function Reservations() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <Card className="p-4">
           <p className="text-sm text-muted-foreground">{t('status.pending')}</p>
-          <p className="text-2xl font-bold text-warning">
-            {allReservations.filter(r => r.status === 'pending').length}
-          </p>
+          {loading ? (
+            <Skeleton className="h-8 w-12 mt-1" />
+          ) : (
+            <p className="text-2xl font-bold text-warning">{stats.pending}</p>
+          )}
         </Card>
         <Card className="p-4">
           <p className="text-sm text-muted-foreground">{t('status.confirmed')}</p>
-          <p className="text-2xl font-bold text-success">
-            {allReservations.filter(r => r.status === 'confirmed').length}
-          </p>
+          {loading ? (
+            <Skeleton className="h-8 w-12 mt-1" />
+          ) : (
+            <p className="text-2xl font-bold text-success">{stats.confirmed}</p>
+          )}
         </Card>
         <Card className="p-4">
           <p className="text-sm text-muted-foreground">{t('status.checkedIn')}</p>
-          <p className="text-2xl font-bold text-info">
-            {allReservations.filter(r => r.status === 'checked_in').length}
-          </p>
+          {loading ? (
+            <Skeleton className="h-8 w-12 mt-1" />
+          ) : (
+            <p className="text-2xl font-bold text-info">{stats.checkedIn}</p>
+          )}
         </Card>
         <Card className="p-4">
           <p className="text-sm text-muted-foreground">{language === 'ar' ? 'الإجمالي' : 'Total'}</p>
-          <p className="text-2xl font-bold">{allReservations.length}</p>
+          {loading ? (
+            <Skeleton className="h-8 w-12 mt-1" />
+          ) : (
+            <p className="text-2xl font-bold">{stats.total}</p>
+          )}
         </Card>
       </div>
 
@@ -186,17 +242,36 @@ export default function Reservations() {
       <Card>
         <CardHeader>
           <CardTitle>
-            {filteredReservations.length} {language === 'ar' ? 'حجز' : 'reservations'}
+            {loading ? (
+              <Skeleton className="h-6 w-24" />
+            ) : (
+              `${filteredReservations.length} ${language === 'ar' ? 'حجز' : 'reservations'}`
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <ReservationsTable 
-            reservations={filteredReservations}
-            onViewDetails={(id) => console.log('View', id)}
-            onStatusChange={(id, status) => console.log('Change status', id, status)}
-          />
+          {loading ? (
+            <div className="space-y-3">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <Skeleton key={i} className="h-12 w-full" />
+              ))}
+            </div>
+          ) : (
+            <ReservationsTable 
+              reservations={filteredReservations}
+              onViewDetails={(id) => console.log('View', id)}
+              onStatusChange={handleStatusChange}
+            />
+          )}
         </CardContent>
       </Card>
+
+      {/* Create Dialog */}
+      <CreateReservationDialog
+        open={createDialogOpen}
+        onOpenChange={setCreateDialogOpen}
+        onSuccess={fetchReservations}
+      />
     </div>
   );
 }
