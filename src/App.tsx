@@ -14,6 +14,7 @@ import { AdminLayout } from "@/layouts/AdminLayout";
 import Index from "@/pages/Index";
 import Search from "@/pages/Search";
 import UnitDetails from "@/pages/UnitDetails";
+import Bookings from "@/pages/Bookings";
 import Auth from "@/pages/Auth";
 import NotFound from "@/pages/NotFound";
 
@@ -46,6 +47,7 @@ const App = () => (
                 <Route path="/" element={<Index />} />
                 <Route path="/search" element={<Search />} />
                 <Route path="/unit/:id" element={<UnitDetails />} />
+                <Route path="/bookings" element={<Bookings />} />
               </Route>
               
               {/* Auth Route */}
