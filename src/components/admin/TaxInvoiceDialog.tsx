@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
+import { companySettings } from '@/config/companySettings';
 import {
   Dialog,
   DialogContent,
@@ -102,14 +103,14 @@ export function TaxInvoiceDialog({ open, onOpenChange, reservationId, existingIn
   const [generating, setGenerating] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
 
-  // Company info (would come from settings in production)
+  // Company info from settings
   const companyInfo = {
-    name_en: 'AWWA Hospitality',
-    name_ar: 'أوا للضيافة',
-    vat_number: '300000000000003',
-    address_en: 'Riyadh, Saudi Arabia',
-    address_ar: 'الرياض، المملكة العربية السعودية',
-    cr_number: '1010000000',
+    name_en: companySettings.establishment_name_en,
+    name_ar: companySettings.establishment_name_ar,
+    vat_number: companySettings.vat_number,
+    address_en: companySettings.address_en,
+    address_ar: companySettings.address_ar,
+    cr_number: companySettings.cr_number,
   };
 
   useEffect(() => {
