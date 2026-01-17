@@ -14,13 +14,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -41,6 +34,7 @@ import {
   Clock,
   AlertCircle,
 } from 'lucide-react';
+import { CreateReservationDialog } from '@/components/admin/reservations/CreateReservationDialog';
 
 // Mock data for Front Desk operations
 const arrivals = [
@@ -172,6 +166,8 @@ export default function FrontDesk() {
   const { language } = useLanguage();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('arrivals');
+  const [showNewReservation, setShowNewReservation] = useState(false);
+  const [showWalkIn, setShowWalkIn] = useState(false);
 
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
@@ -228,16 +224,29 @@ export default function FrontDesk() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" onClick={() => setShowNewReservation(true)}>
             <Plus className="h-4 w-4 me-2" />
             {language === 'ar' ? 'حجز جديد' : 'New Reservation'}
           </Button>
-          <Button size="sm" className="btn-gold">
+          <Button size="sm" className="btn-gold" onClick={() => setShowWalkIn(true)}>
             <User className="h-4 w-4 me-2" />
             {language === 'ar' ? 'زائر بدون حجز' : 'Walk-In'}
           </Button>
         </div>
       </div>
+
+      {/* Dialogs */}
+      <CreateReservationDialog
+        open={showNewReservation}
+        onOpenChange={setShowNewReservation}
+        onSuccess={() => console.log('Reservation created')}
+      />
+      <CreateReservationDialog
+        open={showWalkIn}
+        onOpenChange={setShowWalkIn}
+        isWalkIn
+        onSuccess={() => console.log('Walk-in checked in')}
+      />
 
       {/* Quick Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
