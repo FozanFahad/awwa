@@ -12,7 +12,8 @@ import {
   Menu, 
   X,
   LayoutDashboard,
-  Settings
+  Settings,
+  BarChart3
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import companyLogo from '@/assets/company-logo.jpg';
@@ -22,6 +23,7 @@ const menuItems = [
   { icon: LayoutDashboard, labelEn: 'Dashboard', labelAr: 'لوحة التحكم', path: '/provider' },
   { icon: Building2, labelEn: 'Properties', labelAr: 'العقارات', path: '/provider/properties' },
   { icon: Home, labelEn: 'Units', labelAr: 'الوحدات', path: '/provider/units' },
+  { icon: BarChart3, labelEn: 'Reports', labelAr: 'التقارير', path: '/provider/reports' },
   { icon: Settings, labelEn: 'Settings', labelAr: 'الإعدادات', path: '/provider/settings' },
 ];
 
