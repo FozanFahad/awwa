@@ -1,27 +1,29 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
+import { ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react';
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, isSameDay } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { Link } from 'react-router-dom';
 
-// Mock reservation data for calendar
-const reservations = [
-  { id: '1', unitId: '1', unitName: 'Luxury Penthouse', start: '2026-01-18', end: '2026-01-21', guest: 'Mohammed' },
-  { id: '2', unitId: '2', unitName: 'Modern Studio', start: '2026-01-17', end: '2026-01-19', guest: 'Sara' },
-  { id: '3', unitId: '3', unitName: 'Family Suite', start: '2026-01-20', end: '2026-01-25', guest: 'Khalid' },
-  { id: '4', unitId: '1', unitName: 'Luxury Penthouse', start: '2026-01-25', end: '2026-01-28', guest: 'Ahmed' },
-];
+interface Reservation {
+  id: string;
+  unitId: string;
+  unitName: string;
+  start: string;
+  end: string;
+  guest: string;
+}
 
-const units = [
-  { id: '1', name: 'Luxury Penthouse Suite', nameAr: 'جناح بنتهاوس فاخر' },
-  { id: '2', name: 'Modern Studio Apartment', nameAr: 'شقة استوديو عصرية' },
-  { id: '3', name: 'Family Executive Suite', nameAr: 'جناح عائلي تنفيذي' },
-  { id: '4', name: 'Seaside Luxury Villa', nameAr: 'فيلا فاخرة على البحر' },
-  { id: '5', name: 'Downtown Business Apt', nameAr: 'شقة أعمال وسط المدينة' },
-];
+interface Unit {
+  id: string;
+  name: string;
+  nameAr: string;
+}
 
 const colors = [
   'bg-accent',
@@ -34,10 +36,67 @@ const colors = [
 export default function CalendarPage() {
   const { language, isRTL } = useLanguage();
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [loading, setLoading] = useState(true);
+  const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [units, setUnits] = useState<Unit[]>([]);
 
-  const monthStart = startOfMonth(currentMonth);
-  const monthEnd = endOfMonth(currentMonth);
-  const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
+  useEffect(() => {
+    fetchData();
+  }, [currentMonth]);
+
+  const fetchData = async () => {
+    try {
+      const monthStart = startOfMonth(currentMonth);
+      const monthEnd = endOfMonth(currentMonth);
+
+      // Fetch units
+      const { data: unitsData } = await supabase
+        .from('units')
+        .select('id, name_en, name_ar')
+        .order('name_en');
+
+      // Fetch reservations for the current month
+      const { data: reservationsData } = await supabase
+        .from('reservations')
+        .select(`
+          id,
+          unit_id,
+          start_date,
+          end_date,
+          units (name_en, name_ar),
+          guests (full_name)
+        `)
+        .gte('end_date', format(monthStart, 'yyyy-MM-dd'))
+        .lte('start_date', format(monthEnd, 'yyyy-MM-dd'))
+        .not('status', 'eq', 'cancelled');
+
+      const formattedUnits: Unit[] = (unitsData || []).map((u: any) => ({
+        id: u.id,
+        name: u.name_en,
+        nameAr: u.name_ar,
+      }));
+
+      const formattedReservations: Reservation[] = (reservationsData || []).map((r: any) => ({
+        id: r.id,
+        unitId: r.unit_id,
+        unitName: language === 'ar' ? r.units?.name_ar : r.units?.name_en || '-',
+        start: r.start_date,
+        end: r.end_date,
+        guest: r.guests?.full_name || '-',
+      }));
+
+      setUnits(formattedUnits);
+      setReservations(formattedReservations);
+    } catch (error) {
+      console.error('Error fetching calendar data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const monthStartDate = startOfMonth(currentMonth);
+  const monthEndDate = endOfMonth(currentMonth);
+  const days = eachDayOfInterval({ start: monthStartDate, end: monthEndDate });
 
   const getReservationsForUnitAndDay = (unitId: string, day: Date) => {
     return reservations.filter(res => {
@@ -48,15 +107,72 @@ export default function CalendarPage() {
     });
   };
 
-  const isStartDate = (res: typeof reservations[0], day: Date) => {
+  const isStartDate = (res: Reservation, day: Date) => {
     return isSameDay(new Date(res.start), day);
   };
 
-  const isEndDate = (res: typeof reservations[0], day: Date) => {
+  const isEndDate = (res: Reservation, day: Date) => {
     const end = new Date(res.end);
     end.setDate(end.getDate() - 1);
     return isSameDay(end, day);
   };
+
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
+  const todayArrivals = reservations.filter(r => r.start === todayStr);
+  const todayDepartures = reservations.filter(r => r.end === todayStr);
+
+  if (loading) {
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <div className="flex justify-between items-center">
+          <div>
+            <Skeleton className="h-10 w-48 mb-2" />
+            <Skeleton className="h-5 w-72" />
+          </div>
+          <Skeleton className="h-10 w-48" />
+        </div>
+        <Skeleton className="h-96" />
+      </div>
+    );
+  }
+
+  if (units.length === 0) {
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">
+            {language === 'ar' ? 'التقويم' : 'Calendar'}
+          </h1>
+          <p className="text-muted-foreground">
+            {language === 'ar' 
+              ? 'عرض الحجوزات والتوفر حسب الوحدة'
+              : 'View reservations and availability by unit'}
+          </p>
+        </div>
+        
+        <Card>
+          <CardContent className="py-16">
+            <div className="text-center">
+              <CalendarDays className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold mb-2">
+                {language === 'ar' ? 'لا توجد وحدات' : 'No Units Found'}
+              </h3>
+              <p className="text-muted-foreground mb-4">
+                {language === 'ar' 
+                  ? 'أضف وحدات لعرض التقويم'
+                  : 'Add units to view the calendar'}
+              </p>
+              <Link to="/admin/units">
+                <Button className="btn-gold">
+                  {language === 'ar' ? 'إضافة وحدة' : 'Add Unit'}
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -100,13 +216,13 @@ export default function CalendarPage() {
         <CardContent className="pt-4">
           <div className="flex flex-wrap items-center gap-4">
             <span className="text-sm text-muted-foreground">
-              {language === 'ar' ? 'الحجوزات:' : 'Reservations:'}
+              {language === 'ar' ? 'الوحدات:' : 'Units:'}
             </span>
             {units.slice(0, 5).map((unit, index) => (
               <div key={unit.id} className="flex items-center gap-2">
-                <div className={cn("w-3 h-3 rounded", colors[index])} />
+                <div className={cn("w-3 h-3 rounded", colors[index % colors.length])} />
                 <span className="text-sm">
-                  {language === 'ar' ? unit.nameAr.slice(0, 15) : unit.name.slice(0, 15)}...
+                  {(language === 'ar' ? unit.nameAr : unit.name).slice(0, 15)}...
                 </span>
               </div>
             ))}
@@ -196,9 +312,12 @@ export default function CalendarPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {reservations
-                .filter(r => r.start === format(new Date(), 'yyyy-MM-dd'))
-                .map(res => (
+              {todayArrivals.length === 0 ? (
+                <p className="text-muted-foreground text-center py-4">
+                  {language === 'ar' ? 'لا يوجد وصول اليوم' : 'No arrivals today'}
+                </p>
+              ) : (
+                todayArrivals.map(res => (
                   <div key={res.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
                     <div>
                       <p className="font-medium">{res.guest}</p>
@@ -208,11 +327,7 @@ export default function CalendarPage() {
                       {language === 'ar' ? 'وصول' : 'Arriving'}
                     </Badge>
                   </div>
-                ))}
-              {reservations.filter(r => r.start === format(new Date(), 'yyyy-MM-dd')).length === 0 && (
-                <p className="text-muted-foreground text-center py-4">
-                  {language === 'ar' ? 'لا يوجد وصول اليوم' : 'No arrivals today'}
-                </p>
+                ))
               )}
             </div>
           </CardContent>
@@ -226,9 +341,12 @@ export default function CalendarPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {reservations
-                .filter(r => r.end === format(new Date(), 'yyyy-MM-dd'))
-                .map(res => (
+              {todayDepartures.length === 0 ? (
+                <p className="text-muted-foreground text-center py-4">
+                  {language === 'ar' ? 'لا يوجد مغادرة اليوم' : 'No departures today'}
+                </p>
+              ) : (
+                todayDepartures.map(res => (
                   <div key={res.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
                     <div>
                       <p className="font-medium">{res.guest}</p>
@@ -238,11 +356,7 @@ export default function CalendarPage() {
                       {language === 'ar' ? 'مغادرة' : 'Departing'}
                     </Badge>
                   </div>
-                ))}
-              {reservations.filter(r => r.end === format(new Date(), 'yyyy-MM-dd')).length === 0 && (
-                <p className="text-muted-foreground text-center py-4">
-                  {language === 'ar' ? 'لا يوجد مغادرة اليوم' : 'No departures today'}
-                </p>
+                ))
               )}
             </div>
           </CardContent>
