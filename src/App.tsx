@@ -38,6 +38,7 @@ import ProviderAuth from "@/pages/provider/ProviderAuth";
 import ProviderDashboard from "@/pages/provider/ProviderDashboard";
 import ProviderProperties from "@/pages/provider/ProviderProperties";
 import ProviderUnits from "@/pages/provider/ProviderUnits";
+import ProviderReports from "@/pages/provider/ProviderReports";
 import ProviderSettings from "@/pages/provider/ProviderSettings";
 
 const queryClient = new QueryClient();
@@ -68,6 +69,7 @@ const App = () => (
                 <Route index element={<ProviderDashboard />} />
                 <Route path="properties" element={<ProviderProperties />} />
                 <Route path="units" element={<ProviderUnits />} />
+                <Route path="reports" element={<ProviderReports />} />
                 <Route path="settings" element={<ProviderSettings />} />
               </Route>
               
