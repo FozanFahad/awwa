@@ -1,7 +1,9 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
+// Types
 interface AuthContextType {
   user: User | null;
   session: Session | null;
@@ -10,32 +12,79 @@ interface AuthContextType {
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   isStaff: boolean;
+  isOwner: boolean;
+  isAdmin: boolean;
   userRole: string | null;
+  refreshRole: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+// Role hierarchy for permission checks
+const STAFF_ROLES = ['admin', 'operations_manager', 'staff', 'housekeeping', 'maintenance'];
+const ADMIN_ROLES = ['admin', 'operations_manager'];
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isStaff, setIsStaff] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
+  const { toast } = useToast();
 
+  // Computed permissions
+  const isStaff = userRole ? STAFF_ROLES.includes(userRole) : false;
+  const isAdmin = userRole ? ADMIN_ROLES.includes(userRole) : false;
+  const isOwner = userRole === 'owner';
+
+  // Check user role from database
+  const checkUserRole = useCallback(async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error checking user role:', error);
+        setUserRole(null);
+        return;
+      }
+
+      setUserRole(data?.role || null);
+    } catch (err) {
+      console.error('Error in checkUserRole:', err);
+      setUserRole(null);
+    }
+  }, []);
+
+  // Refresh role manually
+  const refreshRole = useCallback(async () => {
+    if (user) {
+      await checkUserRole(user.id);
+    }
+  }, [user, checkUserRole]);
+
+  // Initialize auth state
   useEffect(() => {
-    // Set up auth state listener FIRST
+    let mounted = true;
+
+    // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      async (event, session) => {
+        if (!mounted) return;
+
         setSession(session);
         setUser(session?.user ?? null);
         
-        // Defer role check with setTimeout
         if (session?.user) {
+          // Use setTimeout to avoid potential deadlocks
           setTimeout(() => {
-            checkUserRole(session.user.id);
+            if (mounted) {
+              checkUserRole(session.user.id);
+            }
           }, 0);
         } else {
-          setIsStaff(false);
           setUserRole(null);
         }
         
@@ -43,8 +92,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     );
 
-    // THEN check for existing session
+    // Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!mounted) return;
+
       setSession(session);
       setUser(session?.user ?? null);
       
@@ -55,80 +106,122 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
-  }, []);
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, [checkUserRole]);
 
-  const checkUserRole = async (userId: string) => {
+  // Sign in
+  const signIn = async (email: string, password: string) => {
     try {
-      const { data, error } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', userId)
-        .maybeSingle();
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
+        password,
+      });
 
       if (error) {
-        console.error('Error checking user role:', error);
-        return;
-      }
-
-      if (data) {
-        setUserRole(data.role);
-        setIsStaff(true);
-      } else {
-        setUserRole(null);
-        setIsStaff(false);
-      }
-    } catch (err) {
-      console.error('Error in checkUserRole:', err);
-    }
-  };
-
-  const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    return { error: error as Error | null };
-  };
-
-  const signUp = async (email: string, password: string, fullName: string) => {
-    const redirectUrl = `${window.location.origin}/`;
-    
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: redirectUrl,
-        data: {
-          full_name: fullName,
-        },
-      },
-    });
-
-    if (!error && data.user) {
-      // Create profile
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert({
-          user_id: data.user.id,
-          email,
-          full_name: fullName,
+        toast({
+          title: 'فشل تسجيل الدخول',
+          description: getErrorMessage(error.message),
+          variant: 'destructive',
         });
-
-      if (profileError) {
-        console.error('Error creating profile:', profileError);
+      } else {
+        toast({
+          title: 'تم تسجيل الدخول',
+          description: 'مرحباً بعودتك!',
+        });
       }
-    }
 
-    return { error: error as Error | null };
+      return { error: error as Error | null };
+    } catch (err) {
+      const error = err as Error;
+      toast({
+        title: 'خطأ',
+        description: 'حدث خطأ غير متوقع',
+        variant: 'destructive',
+      });
+      return { error };
+    }
   };
 
+  // Sign up
+  const signUp = async (email: string, password: string, fullName: string) => {
+    try {
+      const redirectUrl = `${window.location.origin}/`;
+      
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim().toLowerCase(),
+        password,
+        options: {
+          emailRedirectTo: redirectUrl,
+          data: {
+            full_name: fullName,
+          },
+        },
+      });
+
+      if (error) {
+        toast({
+          title: 'فشل إنشاء الحساب',
+          description: getErrorMessage(error.message),
+          variant: 'destructive',
+        });
+        return { error: error as Error };
+      }
+
+      // Create profile if user was created
+      if (data.user) {
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert({
+            user_id: data.user.id,
+            email: email.trim().toLowerCase(),
+            full_name: fullName,
+          });
+
+        if (profileError) {
+          console.error('Error creating profile:', profileError);
+        }
+      }
+
+      toast({
+        title: 'تم إنشاء الحساب',
+        description: 'يرجى تأكيد بريدك الإلكتروني',
+      });
+
+      return { error: null };
+    } catch (err) {
+      const error = err as Error;
+      toast({
+        title: 'خطأ',
+        description: 'حدث خطأ غير متوقع',
+        variant: 'destructive',
+      });
+      return { error };
+    }
+  };
+
+  // Sign out
   const signOut = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-    setSession(null);
-    setIsStaff(false);
-    setUserRole(null);
+    try {
+      await supabase.auth.signOut();
+      setUser(null);
+      setSession(null);
+      setUserRole(null);
+      
+      toast({
+        title: 'تم تسجيل الخروج',
+        description: 'نراك قريباً!',
+      });
+    } catch (err) {
+      console.error('Error signing out:', err);
+      toast({
+        title: 'خطأ',
+        description: 'فشل تسجيل الخروج',
+        variant: 'destructive',
+      });
+    }
   };
 
   return (
@@ -139,18 +232,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signIn, 
       signUp, 
       signOut, 
-      isStaff, 
-      userRole 
+      isStaff,
+      isOwner,
+      isAdmin,
+      userRole,
+      refreshRole,
     }}>
       {children}
     </AuthContext.Provider>
   );
 }
 
+// Custom hook
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
+}
+
+// Helper function to translate error messages
+function getErrorMessage(message: string): string {
+  const errorMap: Record<string, string> = {
+    'Invalid login credentials': 'بيانات الدخول غير صحيحة',
+    'Email not confirmed': 'يرجى تأكيد بريدك الإلكتروني',
+    'User already registered': 'البريد الإلكتروني مسجل مسبقاً',
+    'Password should be at least 6 characters': 'كلمة المرور يجب أن تكون 6 أحرف على الأقل',
+    'Email rate limit exceeded': 'تم تجاوز الحد المسموح، حاول لاحقاً',
+    'Network request failed': 'فشل الاتصال بالخادم',
+  };
+
+  return errorMap[message] || message;
 }
