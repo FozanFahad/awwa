@@ -12,7 +12,7 @@
 @layer base {
   :root {
     /* Core brand colors */
-    --background: 40 30% 98%;
+    --background: 0 0% 100%;
     --foreground: 220 30% 15%;
 
     --card: 0 0% 100%;
@@ -23,14 +23,14 @@
 
     /* Primary: Deep Midnight Navy */
     --primary: 220 45% 20%;
-    --primary-foreground: 40 30% 98%;
+    --primary-foreground: 0 0% 100%;
 
     /* Secondary: Warm Sand */
-    --secondary: 35 25% 92%;
+    --secondary: 220 20% 96%;
     --secondary-foreground: 220 30% 20%;
 
-    /* Muted: Soft Cream */
-    --muted: 40 20% 95%;
+    /* Muted: Soft Gray */
+    --muted: 220 15% 95%;
     --muted-foreground: 220 15% 45%;
 
     /* Accent: Warm Gold */
@@ -51,19 +51,19 @@
     --info-foreground: 0 0% 100%;
 
     /* Borders & inputs */
-    --border: 35 20% 88%;
-    --input: 35 20% 88%;
+    --border: 220 15% 90%;
+    --input: 220 15% 90%;
     --ring: 38 75% 55%;
 
     --radius: 0.75rem;
 
     /* Sidebar */
     --sidebar-background: 220 45% 15%;
-    --sidebar-foreground: 40 20% 95%;
+    --sidebar-foreground: 0 0% 98%;
     --sidebar-primary: 38 75% 55%;
     --sidebar-primary-foreground: 220 45% 15%;
     --sidebar-accent: 220 40% 25%;
-    --sidebar-accent-foreground: 40 20% 95%;
+    --sidebar-accent-foreground: 0 0% 98%;
     --sidebar-border: 220 35% 25%;
     --sidebar-ring: 38 75% 55%;
 
@@ -74,14 +74,14 @@
     --awa-navy: 220 45% 20%;
     --awa-navy-light: 220 35% 35%;
     --awa-navy-dark: 220 50% 12%;
-    --awa-sand: 35 30% 90%;
-    --awa-sand-light: 40 25% 96%;
-    --awa-cream: 40 30% 98%;
+    --awa-sand: 220 15% 96%;
+    --awa-sand-light: 220 10% 98%;
+    --awa-cream: 0 0% 100%;
 
     /* Gradients */
     --gradient-hero: linear-gradient(135deg, hsl(220 45% 15%) 0%, hsl(220 40% 25%) 100%);
     --gradient-gold: linear-gradient(135deg, hsl(38 75% 55%) 0%, hsl(38 80% 65%) 100%);
-    --gradient-card: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(40 20% 98%) 100%);
+    --gradient-card: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(220 15% 98%) 100%);
 
     /* Shadows */
     --shadow-sm: 0 1px 2px 0 hsl(220 30% 15% / 0.05);
