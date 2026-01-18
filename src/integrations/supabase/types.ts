@@ -1601,6 +1601,7 @@ export type Database = {
         | "staff"
         | "housekeeping"
         | "maintenance"
+        | "owner"
       fo_status: "vacant" | "occupied" | "due_out" | "checked_out"
       folio_status: "open" | "closed" | "transferred" | "settled"
       message_channel: "email" | "sms" | "whatsapp"
@@ -1758,6 +1759,7 @@ export const Constants = {
         "staff",
         "housekeeping",
         "maintenance",
+        "owner",
       ],
       fo_status: ["vacant", "occupied", "due_out", "checked_out"],
       folio_status: ["open", "closed", "transferred", "settled"],
