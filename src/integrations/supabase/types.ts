@@ -628,6 +628,7 @@ export type Database = {
           longitude: number | null
           name_ar: string
           name_en: string
+          owner_user_id: string | null
           updated_at: string
         }
         Insert: {
@@ -644,6 +645,7 @@ export type Database = {
           longitude?: number | null
           name_ar: string
           name_en: string
+          owner_user_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -660,6 +662,7 @@ export type Database = {
           longitude?: number | null
           name_ar?: string
           name_en?: string
+          owner_user_id?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -1417,6 +1420,7 @@ export type Database = {
           id: string
           name_ar: string
           name_en: string
+          owner_user_id: string | null
           property_id: string
           size_m2: number | null
           status: Database["public"]["Enums"]["unit_status"]
@@ -1436,6 +1440,7 @@ export type Database = {
           id?: string
           name_ar: string
           name_en: string
+          owner_user_id?: string | null
           property_id: string
           size_m2?: number | null
           status?: Database["public"]["Enums"]["unit_status"]
@@ -1455,6 +1460,7 @@ export type Database = {
           id?: string
           name_ar?: string
           name_en?: string
+          owner_user_id?: string | null
           property_id?: string
           size_m2?: number | null
           status?: Database["public"]["Enums"]["unit_status"]
@@ -1590,6 +1596,11 @@ export type Database = {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
+        Returns: boolean
+      }
+      is_owner: { Args: { _user_id: string }; Returns: boolean }
+      is_property_owner: {
+        Args: { _property_id: string; _user_id: string }
         Returns: boolean
       }
       is_staff_or_above: { Args: { _user_id: string }; Returns: boolean }
