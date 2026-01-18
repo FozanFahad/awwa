@@ -9,6 +9,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 // Layouts
 import { GuestLayout } from "@/layouts/GuestLayout";
 import { AdminLayout } from "@/layouts/AdminLayout";
+import { ProviderLayout } from "@/layouts/ProviderLayout";
 
 // Guest Pages
 import Index from "@/pages/Index";
@@ -32,6 +33,13 @@ import Rooms from "@/pages/admin/Rooms";
 import Profiles from "@/pages/admin/Profiles";
 import Settings from "@/pages/admin/Settings";
 
+// Provider Pages
+import ProviderAuth from "@/pages/provider/ProviderAuth";
+import ProviderDashboard from "@/pages/provider/ProviderDashboard";
+import ProviderProperties from "@/pages/provider/ProviderProperties";
+import ProviderUnits from "@/pages/provider/ProviderUnits";
+import ProviderSettings from "@/pages/provider/ProviderSettings";
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -53,6 +61,15 @@ const App = () => (
               
               {/* Auth Route */}
               <Route path="/auth" element={<Auth />} />
+              
+              {/* Provider Routes */}
+              <Route path="/provider/auth" element={<ProviderAuth />} />
+              <Route path="/provider" element={<ProviderLayout />}>
+                <Route index element={<ProviderDashboard />} />
+                <Route path="properties" element={<ProviderProperties />} />
+                <Route path="units" element={<ProviderUnits />} />
+                <Route path="settings" element={<ProviderSettings />} />
+              </Route>
               
               {/* Admin Routes */}
               <Route path="/admin" element={<AdminLayout />}>
