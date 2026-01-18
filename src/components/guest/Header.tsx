@@ -3,7 +3,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { LanguageToggle } from '@/components/LanguageToggle';
 import { Button } from '@/components/ui/button';
-import { User, Calendar, LogOut, LayoutDashboard, Menu, X } from 'lucide-react';
+import { User, Calendar, LogOut, LayoutDashboard, Menu, X, Building2 } from 'lucide-react';
 import { useState } from 'react';
 
 export function Header() {
@@ -52,6 +52,14 @@ export function Header() {
               {t('nav.dashboard')}
             </Link>
           )}
+          
+          <Link 
+            to="/provider/auth" 
+            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2"
+          >
+            <Building2 className="h-4 w-4" />
+            {language === 'ar' ? 'مقدمي الخدمة' : 'Providers'}
+          </Link>
         </nav>
 
         {/* Right side actions */}
@@ -129,6 +137,15 @@ export function Header() {
                 {t('nav.dashboard')}
               </Link>
             )}
+            
+            <Link 
+              to="/provider/auth" 
+              className="text-sm font-medium text-muted-foreground hover:text-foreground flex items-center gap-2"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              <Building2 className="h-4 w-4" />
+              {language === 'ar' ? 'مقدمي الخدمة' : 'Providers'}
+            </Link>
 
             <div className="pt-4 border-t border-border flex items-center justify-between">
               <LanguageToggle />
