@@ -35,6 +35,7 @@ const Housekeeping = lazy(() => import("@/pages/admin/Housekeeping"));
 const Cashier = lazy(() => import("@/pages/admin/Cashier"));
 const RoomTypes = lazy(() => import("@/pages/admin/RoomTypes"));
 const Rooms = lazy(() => import("@/pages/admin/Rooms"));
+const Properties = lazy(() => import("@/pages/admin/Properties"));
 const Profiles = lazy(() => import("@/pages/admin/Profiles"));
 const Settings = lazy(() => import("@/pages/admin/Settings"));
 
@@ -110,6 +111,7 @@ const App = () => (
                     <Route path="cashier" element={<Cashier />} />
                     <Route path="room-types" element={<RoomTypes />} />
                     <Route path="rooms" element={<Rooms />} />
+                    <Route path="properties" element={<Properties />} />
                     <Route path="profiles" element={<Profiles />} />
                     <Route path="units" element={<AdminUnits />} />
                     <Route path="tasks" element={<AdminTasks />} />

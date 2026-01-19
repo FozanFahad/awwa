@@ -25,6 +25,7 @@ const menuItems = [
   { icon: ClipboardList, labelKey: 'Reservations', path: '/admin/reservations' },
   { icon: CheckSquare, labelKey: 'Housekeeping', path: '/admin/housekeeping' },
   { icon: DollarSign, labelKey: 'Cashier', path: '/admin/cashier' },
+  { icon: Building2, labelKey: 'Properties', path: '/admin/properties' },
   { icon: Building2, labelKey: 'Room Types', path: '/admin/room-types' },
   { icon: Home, labelKey: 'Rooms', path: '/admin/rooms' },
   { icon: Users, labelKey: 'Profiles', path: '/admin/profiles' },
