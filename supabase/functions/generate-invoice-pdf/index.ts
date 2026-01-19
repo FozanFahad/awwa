@@ -372,8 +372,34 @@ serve(async (req) => {
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    
+    // Extract and verify Authorization header
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader) {
+      console.error('No authorization header provided');
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - no authorization header' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Create Supabase client with user's JWT to respect RLS policies
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
+
+    // Verify the user is authenticated
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      console.error('Authentication failed:', authError?.message);
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - invalid token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log('Authenticated user:', user.id);
 
     const { invoiceId, companyInfo } = await req.json();
 
@@ -387,7 +413,8 @@ serve(async (req) => {
 
     console.log('Fetching invoice:', invoiceId);
 
-    // Fetch invoice data
+    // Fetch invoice data - RLS policies will enforce access control
+    // (Staff can view all, guests can only view their own invoices)
     const { data: invoice, error: invoiceError } = await supabase
       .from('invoices')
       .select(`
@@ -404,11 +431,26 @@ serve(async (req) => {
       .eq('id', invoiceId)
       .single();
 
-    if (invoiceError || !invoice) {
-      console.error('Invoice not found:', invoiceError);
+    if (invoiceError) {
+      console.error('Invoice fetch error:', invoiceError);
+      // Check if it's a permission error (no rows returned due to RLS)
+      if (invoiceError.code === 'PGRST116') {
+        return new Response(
+          JSON.stringify({ error: 'Invoice not found or access denied' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
       return new Response(
         JSON.stringify({ error: 'Invoice not found' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (!invoice) {
+      console.error('Invoice not found');
+      return new Response(
+        JSON.stringify({ error: 'Invoice not found or access denied' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -429,7 +471,7 @@ serve(async (req) => {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('Error generating PDF:', errorMessage);
     return new Response(
-      JSON.stringify({ error: errorMessage }),
+      JSON.stringify({ error: 'An error occurred while generating the invoice' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
